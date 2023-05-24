@@ -50,7 +50,6 @@ private:
 public:
     void addContact(const Contact& contact) {
         contacts.push_back(contact);
-        //first delete what is in the message box
         MessageBoxW(NULL, L"Contact added successfully.", L"Success", MB_OK | MB_ICONINFORMATION);
     }
 
