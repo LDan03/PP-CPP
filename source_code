@@ -1,0 +1,309 @@
+#include <windows.h>
+#include <cstdio>
+#include <cstdlib>
+#include <vector>
+#include <string>
+#include <algorithm>
+#include <iostream>
+#include <sstream>
+#include <fstream>
+
+using namespace std;
+
+#define ADD_BUTTON 3
+#define SEARCH_BUTTON 4
+#define DELETE_BUTTON 5
+#define EDIT_BUTTON 6
+
+class Contact {
+private:
+    string name;
+    string phoneNumber;
+    string email;
+    string address;
+
+public:
+    Contact(const string& name, const string& phoneNumber, const string& email, const string& address)
+            : name(name), phoneNumber(phoneNumber), email(email), address(address) {}
+
+    string getName() const {
+        return name;
+    }
+
+    string getPhoneNumber() const {
+        return phoneNumber;
+    }
+
+    string getEmail() const {
+        return email;
+    }
+
+    string getAddress() const {
+        return address;
+    }
+};
+
+class PhoneBook {
+private:
+    vector<Contact> contacts;
+
+public:
+    void addContact(const Contact& contact) {
+        contacts.push_back(contact);
+        //first delete what is in the message box
+        MessageBoxW(NULL, L"Contact added successfully.", L"Success", MB_OK | MB_ICONINFORMATION);
+    }
+
+    void getData(){
+        fstream file;
+        file.open("date.txt", ios::in);
+        contacts.clear();
+        string name;
+        string phoneNumber;
+        string email;
+        string address;
+        while (getline(file, name, '\n')) {
+            getline(file, phoneNumber, '\n');
+            getline(file, email, '\n');
+            getline(file, address, '\n');
+            Contact contact(name, phoneNumber, email, address);
+            addContact(contact);
+        }
+        file.close();
+    }
+    string searchContact(const string& searchTerm) {
+        string searchResults;
+        bool found = false;
+
+        for (const auto& contact : contacts) {
+            if (contact.getName() == searchTerm) {
+                searchResults += "Name: " + contact.getName() + "\n";
+                searchResults += "Phone Number: " + contact.getPhoneNumber() + "\n";
+                searchResults += "Email: " + contact.getEmail() + "\n";
+                searchResults += "Address: " + contact.getAddress() + "\n\n";
+                found = true;
+            }
+        }
+
+        if (found) {
+            return searchResults;
+        }
+        else {
+            return "No matching contacts found.";
+        }
+    }
+    void removeContact(const string& contactName) {
+        auto it = find_if(contacts.begin(), contacts.end(), [&](const Contact& contact) {
+            return contact.getName() == contactName;
+        });
+
+        if (it != contacts.end()) {
+            contacts.erase(it);
+            MessageBoxW(NULL, L"Contact removed successfully.", L"Success", MB_OK | MB_ICONINFORMATION);
+        }
+        else {
+            MessageBoxW(NULL, L"No contact found with the given name.", L"Error", MB_OK | MB_ICONERROR);
+        }
+    }
+
+    void editContact(const string& contactName, const Contact& newContact) {
+        auto it = find_if(contacts.begin(), contacts.end(), [&](const Contact& contact) {
+            return contact.getName() == contactName;
+        });
+
+        if (it != contacts.end()) {
+            *it = newContact;
+            MessageBoxW(NULL, L"Contact updated successfully.", L"Success", MB_OK | MB_ICONINFORMATION);
+        }
+        else {
+            MessageBoxW(NULL, L"No contact found with the given name.", L"Error", MB_OK | MB_ICONERROR);
+        }
+    }
+};
+
+PhoneBook phoneBook;
+
+HWND address, name, phoneNumber, email, hout;
+
+void AddContact(const string& contactString) {
+    vector<string> contactDetails;
+    string detail;
+
+    for (char ch : contactString) {
+        if (ch == ',') {
+            contactDetails.push_back(detail);
+            detail.clear();
+        }
+        else {
+            detail.push_back(ch);
+        }
+    }
+
+    if (contactDetails.size() == 4) {
+        Contact contact(contactDetails[0], contactDetails[1], contactDetails[2], contactDetails[3]);
+        phoneBook.addContact(contact);
+    }
+    else {
+        MessageBoxW(NULL, L"Invalid contact details. Please provide all details.", L"Error", MB_OK | MB_ICONERROR);
+    }
+}
+
+void SearchContact(const string& searchTerm) {
+    string searchResults = phoneBook.searchContact(searchTerm);
+    SetWindowTextW(hout, wstring(searchResults.begin(), searchResults.end()).c_str());
+}
+
+void RemoveContact(const string& contactName) {
+    phoneBook.removeContact(contactName);
+}
+
+void EditContact(const std::string& contactName, const std::string& newContactString) {
+    vector<std::string> contactDetails;
+    string detail;
+
+    for (char ch : newContactString) {
+        if (ch == ',') {
+            contactDetails.push_back(detail);
+            detail.clear();
+        }
+        else {
+            detail.push_back(ch);
+        }
+    }
+
+    if (contactDetails.size() == 4) {
+        Contact newContact(contactDetails[0], contactDetails[1], contactDetails[2], contactDetails[3]);
+        phoneBook.editContact(contactName, newContact);
+    }
+    else {
+        MessageBoxW(NULL, L"Invalid contact details. Please provide all details.", L"Error", MB_OK | MB_ICONERROR);
+    }
+}
+
+wstring GetWindowTextAsString(HWND hwnd) {
+    int length = GetWindowTextLengthW(hwnd) + 1;
+    wchar_t* buffer = new wchar_t[length];
+    GetWindowTextW(hwnd, buffer, length);
+    wstring text(buffer);
+    delete[] buffer;
+    return text;
+}
+
+void AddControls(HWND hwnd);
+
+LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT message, WPARAM wp, LPARAM lp) {
+    switch (message) {
+        case WM_COMMAND:
+            switch (wp) {
+                case ADD_BUTTON: {
+                    wchar_t nameText[100], phoneNumberText[100], emailText[100], addressText[100];
+                    GetWindowTextW(name, nameText, 100);
+                    GetWindowTextW(phoneNumber, phoneNumberText, 100);
+                    GetWindowTextW(email, emailText, 100);
+                    GetWindowTextW(address, addressText, 100);
+
+                    wstring nameStr(nameText);
+                    wstring phoneNumberStr(phoneNumberText);
+                    wstring emailStr(emailText);
+                    wstring addressStr(addressText);
+
+                    if (!nameStr.empty() && !phoneNumberStr.empty() && !emailStr.empty() && !addressStr.empty()) {
+                        string nameA(nameStr.begin(), nameStr.end());
+                        string phoneNumberA(phoneNumberStr.begin(), phoneNumberStr.end());
+                        string emailA(emailStr.begin(), emailStr.end());
+                        string addressA(addressStr.begin(), addressStr.end());
+
+                        Contact contact(nameA, phoneNumberA, emailA, addressA);
+                        phoneBook.addContact(contact);
+
+                        MessageBoxW(hwnd, L"Contact added successfully.", L"Success", MB_OK);
+                    } else {
+                        MessageBoxW(hwnd, L"Please fill in all fields.", L"Error", MB_OK | MB_ICONERROR);
+                    }
+                    break;
+                }
+                case SEARCH_BUTTON:
+                {
+                    wstring searchTerm = GetWindowTextAsString(name);
+                    SearchContact(string(searchTerm.begin(), searchTerm.end()));
+                }
+                    break;
+                case DELETE_BUTTON:
+                {
+                    wstring contactName = GetWindowTextAsString(name);
+                    RemoveContact(string(contactName.begin(), contactName.end()));
+                }
+                    break;
+                case EDIT_BUTTON:
+                {
+                    wstring contactName = GetWindowTextAsString(name);
+                    wstring newContactText = GetWindowTextAsString(hout);
+                    EditContact(std::string(contactName.begin(), contactName.end()), string(newContactText.begin(), newContactText.end()));
+                }
+                    break;
+            }
+            break;
+
+        case WM_CREATE:
+            AddControls(hwnd);
+            break;
+
+        case WM_DESTROY:
+            PostQuitMessage(0);
+            break;
+
+        default:
+            return DefWindowProcW(hwnd, message, wp, lp);
+    }
+
+    return 0;
+}
+
+
+
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+    WNDCLASSW work = { 0 };
+    work.hCursor = LoadCursor(NULL, IDC_ARROW);
+    work.lpszClassName = L"WindowsClass";
+    work.hInstance = hInstance;
+    work.lpfnWndProc = WindowProcedure;
+
+    if (!RegisterClassW(&work))
+        return -1;
+
+    CreateWindowW(L"WindowsClass", L"PhoneBook", WS_OVERLAPPEDWINDOW | WS_VISIBLE, 400, 100, 700, 650, NULL, NULL, NULL, NULL);
+
+    MSG message = { 0 };
+    while (GetMessage(&message, NULL, (UINT)NULL, (UINT)NULL)) {
+        TranslateMessage(&message);
+        DispatchMessage(&message);
+    }
+
+    return 0;
+}
+
+void AddControls(HWND hwnd) {
+    CreateWindowW(L"static", L"Menu", WS_VISIBLE | WS_CHILD | SS_CENTER, 325, 50, 100, 20, hwnd, NULL, NULL, NULL);
+
+    CreateWindowW(L"static", L"Email:", WS_VISIBLE | WS_CHILD, 400, 230, 100, 20, hwnd, NULL, NULL, NULL);
+    email = CreateWindowW(L"edit", L"", WS_VISIBLE | WS_CHILD | WS_BORDER | SS_CENTER | ES_AUTOVSCROLL | ES_MULTILINE | ES_AUTOHSCROLL, 500, 230, 100, 20, hwnd, NULL, NULL, NULL);
+
+    CreateWindowW(L"static", L"Address:", WS_VISIBLE | WS_CHILD, 400, 200, 100, 20, hwnd, NULL, NULL, NULL);
+    address = CreateWindowW(L"edit", L"", WS_VISIBLE | WS_CHILD | WS_BORDER | SS_CENTER | ES_AUTOVSCROLL | ES_MULTILINE | ES_AUTOHSCROLL, 500, 200, 100, 20, hwnd, NULL, NULL, NULL);
+
+    CreateWindowW(L"static", L"Phone Number:", WS_VISIBLE | WS_CHILD, 400, 170, 100, 20, hwnd, NULL, NULL, NULL);
+    phoneNumber = CreateWindowW(L"edit", L"", WS_VISIBLE | WS_CHILD | WS_BORDER | SS_CENTER | ES_AUTOVSCROLL | ES_MULTILINE | ES_AUTOHSCROLL, 500, 170, 100, 20, hwnd, NULL, NULL, NULL);
+
+    CreateWindowW(L"static", L"Name:", WS_VISIBLE | WS_CHILD, 400, 140, 100, 20, hwnd, NULL, NULL, NULL);
+    name = CreateWindowW(L"edit", L"", WS_VISIBLE | WS_CHILD | WS_BORDER | SS_CENTER | ES_AUTOVSCROLL | ES_MULTILINE | ES_AUTOHSCROLL, 500, 140, 100, 20, hwnd, NULL, NULL, NULL);
+
+    CreateWindowW(L"button", L"Add", WS_VISIBLE | SS_CENTER | WS_CHILD, 100, 200, 100, 50, hwnd, (HMENU)ADD_BUTTON, NULL, NULL);
+
+    CreateWindowW(L"button", L"Delete", WS_VISIBLE | SS_CENTER | WS_CHILD, 100, 300, 100, 50, hwnd, (HMENU)DELETE_BUTTON, NULL, NULL);
+
+    CreateWindowW(L"button", L"Search", WS_VISIBLE | SS_CENTER | WS_CHILD, 100, 400, 100, 50, hwnd, (HMENU)SEARCH_BUTTON, NULL, NULL);
+
+    CreateWindowW(L"button", L"Edit", WS_VISIBLE | SS_CENTER | WS_CHILD, 100, 500, 100, 50, hwnd, (HMENU)EDIT_BUTTON, NULL, NULL);
+
+    hout = CreateWindowW(L"edit", L"", WS_VISIBLE | WS_CHILD | WS_BORDER | ES_AUTOVSCROLL | ES_MULTILINE | ES_AUTOHSCROLL, 300, 300, 350, 250, hwnd, NULL, NULL, NULL);
+}
